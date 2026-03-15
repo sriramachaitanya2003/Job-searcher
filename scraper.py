@@ -18,12 +18,12 @@ EMAIL_SENDER    = os.environ["EMAIL_SENDER"]       # e.g. yourname@gmail.com
 EMAIL_PASSWORD  = os.environ["EMAIL_PASSWORD"]     # Gmail App Password
 EMAIL_RECIPIENT = os.environ["EMAIL_RECIPIENT"]    # where to send the report
 
-# ─── APIFY ACTOR IDS ─────────────────────────────────────────────────────────
+# ─── APIFY ACTOR IDS (verified from Apify Store) ─────────────────────────────
 ACTORS = {
-    "LinkedIn":    "curious_coder/linkedin-jobs-scraper",
-    "Indeed":      "misceres/indeed-scraper",
-    "Naukri":      "pratikdaigavane/naukri-jobs-scraper",
-    "Internshala": "curious_coder/internshala-scraper",
+    "LinkedIn":    "curious_coder/linkedin-jobs-scraper",   # 95.7% success, 4.9★
+    "Indeed":      "borderline/indeed-scraper",              # 97.4% success, 4.87★
+    "Naukri":      "muhammetakkurtt/naukri-job-scraper",     # 99.4% success, India-specific
+    "Internshala": "bareezh_codes/internshala-scrapper",     # India fresher focused
 }
 
 SEARCH_QUERIES = [
@@ -95,10 +95,10 @@ def scrape_linkedin(queries, locations) -> list:
         for loc in locations:
             print(f"  LinkedIn: '{query}' | {loc}")
             raw = run_actor(ACTORS["LinkedIn"], {
-                "searchQueries": [query],
+                "keyword": query,
                 "location": loc,
-                "maxResults": 30,
-                "contractType": "FULL_TIME",
+                "count": 30,
+                "proxy": {"useApifyProxy": True},
             })
             for item in raw:
                 n = normalise(item, "LinkedIn")
@@ -113,11 +113,10 @@ def scrape_indeed(queries, locations) -> list:
         for loc in locations:
             print(f"  Indeed: '{query}' | {loc}")
             raw = run_actor(ACTORS["Indeed"], {
-                "position": query,
-                "country": "IN" if loc == "India" else "worldwide",
-                "location": loc,
+                "keyword": query,
+                "location": "India" if loc == "India" else "Remote",
                 "maxItems": 30,
-                "startUrls": [],
+                "proxy": {"useApifyProxy": True},
             })
             for item in raw:
                 n = normalise(item, "Indeed")
@@ -133,8 +132,7 @@ def scrape_naukri(queries) -> list:
         raw = run_actor(ACTORS["Naukri"], {
             "keyword": query,
             "experience": "0",
-            "location": "India",
-            "maxResults": 30,
+            "maxJobs": 30,
         })
         for item in raw:
             n = normalise(item, "Naukri")
@@ -148,8 +146,9 @@ def scrape_internshala(queries) -> list:
     for query in queries[:2]:
         print(f"  Internshala: '{query}'")
         raw = run_actor(ACTORS["Internshala"], {
-            "searchQuery": query,
-            "maxResults": 30,
+            "category": query,
+            "workFromHome": True,
+            "maxItems": 30,
         })
         for item in raw:
             n = normalise(item, "Internshala")
@@ -306,16 +305,28 @@ def main():
     all_jobs = []
 
     print("[1/4] LinkedIn")
-    all_jobs += scrape_linkedin(SEARCH_QUERIES, LOCATIONS)
+    try:
+        all_jobs += scrape_linkedin(SEARCH_QUERIES, LOCATIONS)
+    except Exception as e:
+        print(f"  ⚠ LinkedIn failed: {e}")
 
     print("[2/4] Indeed")
-    all_jobs += scrape_indeed(SEARCH_QUERIES, LOCATIONS)
+    try:
+        all_jobs += scrape_indeed(SEARCH_QUERIES, LOCATIONS)
+    except Exception as e:
+        print(f"  ⚠ Indeed failed: {e}")
 
     print("[3/4] Naukri")
-    all_jobs += scrape_naukri(SEARCH_QUERIES)
+    try:
+        all_jobs += scrape_naukri(SEARCH_QUERIES)
+    except Exception as e:
+        print(f"  ⚠ Naukri failed: {e}")
 
     print("[4/4] Internshala")
-    all_jobs += scrape_internshala(SEARCH_QUERIES)
+    try:
+        all_jobs += scrape_internshala(SEARCH_QUERIES)
+    except Exception as e:
+        print(f"  ⚠ Internshala failed: {e}")
 
     jobs = deduplicate(all_jobs)
     print(f"\n✅ Total unique jobs: {len(jobs)}\n")
